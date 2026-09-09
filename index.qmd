@@ -55,9 +55,9 @@ labels <- sprintf(
 # Color tracts by percentage White
 pal <- colorNumeric(palette = "Blues", domain = race_wide$pct_white)
 
-# Build interactive leaflet map without attribution watermark
+# Build interactive leaflet map
 leaflet(race_wide, options = leafletOptions(attributionControl = FALSE)) |>
-  addProviderTiles(providers$CartoDB.Positron) |>
+  addTiles() |>
   addPolygons(
     fillColor = ~ pal(pct_white),
     weight = 1,
