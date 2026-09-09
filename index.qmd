@@ -1,0 +1,89 @@
+---
+title: "Race and Ethnicity in Sarasota, Florida"
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+
+sarasota_race <- read_rds("data/sarasota_race.rds")
+```
+
+```{r}
+#| label: map
+
+# Pivot the data to wide format to calculate percentages by tract
+race_wide <- sarasota_race |>
+  filter(variable %in% c("P2_001N", "P2_002N", "P2_005N", "P2_006N", "P2_008N")) |>
+  mutate(variable = case_when(
+    variable == "P2_001N" ~ "total",
+    variable == "P2_002N" ~ "hispanic",
+    variable == "P2_005N" ~ "white",
+    variable == "P2_006N" ~ "black",
+    variable == "P2_008N" ~ "asian"
+  )) |>
+  pivot_wider(names_from = variable, values_from = value) |>
+  mutate(
+    pct_white = round(100 * white / total, 1),
+    pct_hispanic = round(100 * hispanic / total, 1),
+    pct_black = round(100 * black / total, 1),
+    pct_asian = round(100 * asian / total, 1),
+    pct_other = round(100 * (total - hispanic - white - black - asian) / total, 1)
+  ) |>
+  st_transform(4326)
+
+# Create hover labels displaying race percentages for each tract
+labels <- sprintf(
+  "<strong>%s</strong><br/>Total Population: %s<br/>White: %.1f%%<br/>Hispanic: %.1f%%<br/>Black: %.1f%%<br/>Asian: %.1f%%<br/>Other: %.1f%%",
+  race_wide$NAME,
+  format(race_wide$total, big.mark = ","),
+  race_wide$pct_white,
+  race_wide$pct_hispanic,
+  race_wide$pct_black,
+  race_wide$pct_asian,
+  race_wide$pct_other
+) |>
+  lapply(HTML)
+
+# Color tracts by percentage White
+pal <- colorNumeric(palette = "Blues", domain = race_wide$pct_white)
+
+# Build interactive leaflet map without attribution watermark
+leaflet(race_wide, options = leafletOptions(attributionControl = FALSE)) |>
+  addProviderTiles(providers$CartoDB.Positron) |>
+  addPolygons(
+    fillColor = ~ pal(pct_white),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "13px",
+      direction = "auto"
+    )
+  ) |>
+  addLegend(
+    pal = pal,
+    values = ~ pct_white,
+    opacity = 0.7,
+    title = "% White",
+    position = "bottomright"
+  )
+```
